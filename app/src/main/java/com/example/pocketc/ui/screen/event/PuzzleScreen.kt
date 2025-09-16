@@ -5,14 +5,20 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,8 +36,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.createBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.ImageLoader
@@ -56,46 +64,157 @@ fun PuzzleScreen(viewModel: PuzzleViewModel = viewModel()) {
         bitmap = loadBitmapFromUrl(context, puzzleImageUrl, placeholderBitmap)
     }
 
-    Scaffold { innerPadding ->
-        Column(
+    Scaffold(
+        topBar = {
+            // todo -> nullable
+            TopBar(puzzleDataState?.filledCount ?: 0, puzzleDataState?.totalPieces ?: 0)
+        }
+    ) { innerPadding ->
+        LazyColumn (
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 다른 UI 요소들 (ex: 상단바, 유저 정보, 랭킹 등)
-            Text("퍼즐 이벤트")
-
-            // 퍼즐 부분만 별도의 컴포넌트로 분리
-            bitmap?.let { loadedBitmap ->
-                puzzleDataState?.let { data ->
-                    // 데이터가 로드된 경우 퍼즐 그리드 표시
-                    PuzzleGrid(data, loadedBitmap)
+            item {
+                // 퍼즐 부분만 별도의 컴포넌트로 분리
+                bitmap?.let { loadedBitmap ->
+                    puzzleDataState?.let { data ->
+                        // 데이터가 로드된 경우 퍼즐 그리드 표시
+                        PuzzleGrid(data, loadedBitmap)
+                    } ?: LoadingPlaceholder()
                 } ?: LoadingPlaceholder()
-            } ?: LoadingPlaceholder()
+                Spacer(modifier = Modifier.height(24.dp))
+            }
 
-            // 다른 UI 요소들 (ex: 랭킹 리스트)
-            // RankingList()
-        }
-    }
-}
+            item {
+                // 횟수 표시
+                AttemptsSection(attemptCount = 2) // 예시로 2를 사용
 
-// todo 다른 파일로 분리
-@Composable
-fun PuzzleGrid(puzzleData: PuzzleData, bitmap: Bitmap) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        items(puzzleData.puzzles.size) { index ->
-            val puzzle = puzzleData.puzzles[index]
-            val pieceBitmap = cropBitmapPiece(bitmap, puzzle.row, puzzle.column, 3, 3)
-            PuzzleItem(puzzle, pieceBitmap) { pieceId ->
-                // 클릭 이벤트
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            // todo; 맞추기 버튼
+
+            // 랭킹 리스트 부분
+            items(
+                items = listOf(
+                    UserRanking(1, "맹구", 4, 16),
+                    UserRanking(2, "짱구", 2, 16),
+                    UserRanking(2, "철수", 2, 16),
+                    UserRanking(3, "훈이", 1, 16),
+                    UserRanking(3, "유리", 1, 16),
+                    UserRanking(2, "흰둥이", 0, 16)
+                )
+            ) { ranking ->
+                RankingItem(ranking)
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
 }
+
+@Composable
+fun PuzzleGrid(puzzleData: PuzzleData, bitmap: Bitmap) {
+    val totalCols = 4 // todo 퍼즐 열 수 고정
+    val puzzleRows = puzzleData.puzzles.chunked(totalCols)
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        puzzleRows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly // 조각들을 균등하게 배치
+            ) {
+                row.forEach { puzzle ->
+                    val pieceBitmap = cropBitmapPiece(
+                        bitmap,
+                        puzzle.row,
+                        puzzle.column,
+                        puzzleData.totalPieces / totalCols,
+                        totalCols
+                    )
+                    PuzzleItem(
+                        puzzle = puzzle,
+                        piece = pieceBitmap,
+                        onPuzzleClick = { /* 클릭 이벤트 처리 */ },
+                        modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TopBar(filledCount: Int, totalPieces: Int) {
+    Box (
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = "$filledCount / $totalPieces",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.Center)
+        )
+        Button(
+            onClick = { /* 나가기 버튼 클릭 이벤트 */ },
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+            modifier = Modifier.align(Alignment.CenterEnd)
+        ) {
+            Text("나가기", color = Color.White)
+        }
+    }
+}
+
+@Composable
+fun AttemptsSection(attemptCount: Int) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        Text(
+            text = "횟수: $attemptCount",
+            fontSize = 14.sp
+        )
+    }
+}
+
+@Composable
+fun RankingItem(ranking: UserRanking) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.LightGray)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "${ranking.rank}",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                modifier = Modifier.padding(end = 8.dp)
+            )
+            Text(text = ranking.nickname, fontSize = 16.sp)
+        }
+        Text(
+            text = "${ranking.filledCount} / ${ranking.totalPieces}",
+            fontSize = 16.sp
+        )
+    }
+}
+
+data class UserRanking(
+    val rank: Int,
+    val nickname: String,
+    val filledCount: Int,
+    val totalPieces: Int
+)
 
 fun rememberPlaceholderBitmap(): Bitmap {
     return createBitmap(100, 100).apply {
@@ -132,10 +251,11 @@ fun LoadingPlaceholder() { // todo 진짜 로딩으로 바꾸기
 fun PuzzleItem(
     puzzle: Puzzle,
     piece: ImageBitmap?,
-    onPuzzleClick: (Int) -> Unit
+    onPuzzleClick: (Int) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .aspectRatio(1f)
             .padding(2.dp),
         contentAlignment = Alignment.Center
@@ -182,35 +302,60 @@ fun PreviewPuzzleScreen() {
         rememberPlaceholderBitmap()
     }
 
-    val dummyPuzzles = List(9) { index ->
+    val dummyPuzzles = List(16) { index ->
         Puzzle(
             pieceId = index + 1,
-            row = (index / 3) + 1,
-            column = (index % 3) + 1,
+            row = (index / 4) + 1,
+            column = (index % 4) + 1,
             filledBy = if (index % 2 == 0) User(1, "UserA") else null,
             filledAt = null
         )
     }
     val dummyPuzzleData =
-        PuzzleData(puzzles = dummyPuzzles, totalPieces = 9, filledCount = 5)
+        PuzzleData(puzzles = dummyPuzzles, totalPieces = 16, filledCount = 10)
 
-    Scaffold { innerPadding ->
-        Column(
+    Scaffold(
+        topBar = {
+            // todo -> nullable
+            TopBar(dummyPuzzleData.filledCount, dummyPuzzleData.totalPieces)
+        }
+    ) { innerPadding ->
+        LazyColumn (
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 다른 UI 요소들 (ex: 상단바, 유저 정보, 랭킹 등)
-            Text("퍼즐 이벤트")
+            item {
+                // 퍼즐 부분만 별도의 컴포넌트로 분리
+                PuzzleGrid(
+                    puzzleData = dummyPuzzleData,
+                    bitmap = grayBitmap
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+            }
 
-            PuzzleGrid(
-                puzzleData = dummyPuzzleData,
-                bitmap = grayBitmap
-            )
+            item {
+                // 횟수 표시
+                AttemptsSection(attemptCount = 2) // 예시로 2를 사용
 
-            // 다른 UI 요소들 (ex: 랭킹 리스트)
-            // RankingList()
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            // 랭킹 리스트 부분
+            items(
+                items = listOf(
+                    UserRanking(1, "맹구", 4, 16),
+                    UserRanking(2, "짱구", 2, 16),
+                    UserRanking(2, "철수", 2, 16),
+                    UserRanking(3, "훈이", 1, 16),
+                    UserRanking(3, "유리", 1, 16),
+                    UserRanking(2, "흰둥이", 0, 16)
+                )
+            ) { ranking ->
+                RankingItem(ranking)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
     }
 }
